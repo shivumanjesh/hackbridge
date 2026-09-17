@@ -66,36 +66,43 @@ export const StudentTeamPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
-    const { hackathons: hList, error: hError } = await fetchTenantHackathons(effectiveTenantId);
-    if (hError) setError(hError);
+    try {
+      const { hackathons: hList, error: hError } = await fetchTenantHackathons(effectiveTenantId);
+      if (hError) setError(hError);
 
-    const availableHackathons = hList ?? [];
-    setHackathons(availableHackathons);
+      const availableHackathons = hList ?? [];
+      setHackathons(availableHackathons);
 
-    // Pick active or first hackathon
-    let activeHackathon = availableHackathons.find(
-      (h) => h.status === 'registration' || h.status === 'problem_intake' || h.status === 'hacking'
-    );
-    if (!activeHackathon && availableHackathons.length > 0) {
-      activeHackathon = availableHackathons[0];
+      // Pick active or first hackathon
+      let activeHackathon = availableHackathons.find(
+        (h) => h.status === 'registration' || h.status === 'problem_intake' || h.status === 'hacking'
+      );
+      if (!activeHackathon && availableHackathons.length > 0) {
+        activeHackathon = availableHackathons[0];
+      }
+
+      const currentHackathonId = selectedHackathonId || activeHackathon?.id || '';
+      if (!selectedHackathonId && currentHackathonId) {
+        setSelectedHackathonId(currentHackathonId);
+      }
+
+      if (currentHackathonId) {
+        const { team, error: tError } = await fetchMyTeam(currentHackathonId, effectiveUserId);
+        if (tError) setError(tError);
+        setMyTeam(team);
+      }
+    } catch (err: any) {
+      console.warn('[StudentTeamPage] Error loading data:', err);
+      setError(err?.message || 'Unable to load team status.');
+    } finally {
+      setIsLoading(false);
     }
-
-    const currentHackathonId = selectedHackathonId || activeHackathon?.id || '';
-    if (!selectedHackathonId && currentHackathonId) {
-      setSelectedHackathonId(currentHackathonId);
-    }
-
-    if (currentHackathonId) {
-      const { team, error: tError } = await fetchMyTeam(currentHackathonId, effectiveUserId);
-      if (tError) setError(tError);
-      setMyTeam(team);
-    }
-
-    setIsLoading(false);
   }, [tenantId, user?.id, selectedHackathonId]);
 
   useEffect(() => {
-    void loadData();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadData().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadData]);
 
   // ── 2. Handle Hackathon Change ─────────────────────────────────────────────

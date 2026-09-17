@@ -65,31 +65,38 @@ export const CompanyTalentPoolPage: React.FC = () => {
     setErrorMessage(null);
     setIsMigrationMissing(false);
 
-    const [poolRes, pipeRes] = await Promise.all([
-      fetchCompanyTalentPool(companyId, tenantId || 'mitt', {
-        search: searchQuery,
-        badge: selectedBadge,
-        skill: selectedSkill !== 'all' ? selectedSkill : undefined,
-      }),
-      fetchCompanyOutreachPipeline(companyId),
-    ]);
+    try {
+      const [poolRes, pipeRes] = await Promise.all([
+        fetchCompanyTalentPool(companyId, tenantId || 'mitt', {
+          search: searchQuery,
+          badge: selectedBadge,
+          skill: selectedSkill !== 'all' ? selectedSkill : undefined,
+        }),
+        fetchCompanyOutreachPipeline(companyId),
+      ]);
 
-    if (poolRes.error) {
-      setErrorMessage(poolRes.error);
-      if (poolRes.isMigrationMissing) setIsMigrationMissing(true);
-    } else {
-      setCandidates(poolRes.candidates);
+      if (poolRes.error) {
+        setErrorMessage(poolRes.error);
+        if (poolRes.isMigrationMissing) setIsMigrationMissing(true);
+      } else {
+        setCandidates(poolRes.candidates);
+      }
+
+      if (pipeRes.pipeline) {
+        setPipeline(pipeRes.pipeline);
+      }
+    } catch (err: any) {
+      console.warn('[CompanyTalentPoolPage] Error loading talent pool:', err);
+      setErrorMessage(err?.message || 'Unable to load talent pool.');
+    } finally {
+      setIsLoading(false);
     }
-
-    if (pipeRes.pipeline) {
-      setPipeline(pipeRes.pipeline);
-    }
-
-    setIsLoading(false);
   }, [companyId, tenantId, searchQuery, selectedBadge, selectedSkill]);
 
   useEffect(() => {
-    loadData();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadData().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadData]);
 
   // Open Modal

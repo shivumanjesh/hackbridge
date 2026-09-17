@@ -40,27 +40,34 @@ export const AdminAuditPage: React.FC = () => {
     setErrorMessage(null);
     setIsMigrationMissing(false);
 
-    const { logs: data, error, isMigrationMissing: missing } = await fetchAuditLogs(
-      tenantId || 'mitt',
-      {
-        search: searchQuery,
-        action: selectedCategory !== 'all' ? selectedCategory : undefined,
-        targetType: selectedTargetType !== 'all' ? selectedTargetType : undefined,
+    try {
+      const { logs: data, error, isMigrationMissing: missing } = await fetchAuditLogs(
+        tenantId || 'mitt',
+        {
+          search: searchQuery,
+          action: selectedCategory !== 'all' ? selectedCategory : undefined,
+          targetType: selectedTargetType !== 'all' ? selectedTargetType : undefined,
+        }
+      );
+
+      if (error) {
+        setErrorMessage(error);
+        if (missing) setIsMigrationMissing(true);
+      } else {
+        setLogs(data);
       }
-    );
-
-    if (error) {
-      setErrorMessage(error);
-      if (missing) setIsMigrationMissing(true);
-    } else {
-      setLogs(data);
+    } catch (err: any) {
+      console.warn('[AdminAuditPage] Error loading audit logs:', err);
+      setErrorMessage(err?.message || 'Unable to load audit logs.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, [tenantId, searchQuery, selectedCategory, selectedTargetType]);
 
   useEffect(() => {
-    loadLogs();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadLogs().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadLogs]);
 
   const handleExportJSON = () => {

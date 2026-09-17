@@ -41,18 +41,25 @@ export const EvaluatorAssignmentsPage: React.FC = () => {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const { assignments: list, error } = await fetchEvaluatorAssignments(effectiveUserId);
-    if (error) {
-      setErrorMessage(error);
-    } else {
-      setAssignments(list);
+    try {
+      const { assignments: list, error } = await fetchEvaluatorAssignments(effectiveUserId);
+      if (error) {
+        setErrorMessage(error);
+      } else {
+        setAssignments(list);
+      }
+    } catch (err: any) {
+      console.warn('[EvaluatorAssignmentsPage] Error loading assignments:', err);
+      setErrorMessage(err?.message || 'Unable to load assignments.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, [user?.id]);
 
   useEffect(() => {
-    loadAssignments();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadAssignments().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadAssignments]);
 
   // ── KPI Counts ───────────────────────────────────────────────────────────

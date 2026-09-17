@@ -75,64 +75,71 @@ export const EvaluatorScoringPage: React.FC = () => {
 
     const effectiveUserId = user?.id || 'u-evaluator-1';
 
-    // 1. Fetch evaluator assignments list to support switching entries directly in scoring desk
-    const { assignments: list } = await fetchEvaluatorAssignments(effectiveUserId);
-    setAllAssignments(list);
+    try {
+      // 1. Fetch evaluator assignments list to support switching entries directly in scoring desk
+      const { assignments: list } = await fetchEvaluatorAssignments(effectiveUserId);
+      setAllAssignments(list);
 
-    let targetId = assignmentId;
-    if (!targetId && list.length > 0) {
-      const pending = list.find((a) => a.status === 'pending' || a.status === 'in_progress');
-      targetId = (pending || list[0]).id;
-    }
+      let targetId = assignmentId;
+      if (!targetId && list.length > 0) {
+        const pending = list.find((a) => a.status === 'pending' || a.status === 'in_progress');
+        targetId = (pending || list[0]).id;
+      }
 
-    if (!targetId) {
-      setErrorMessage('No submissions currently assigned to your evaluator profile.');
+      if (!targetId) {
+        setErrorMessage('No submissions currently assigned to your evaluator profile.');
+        setIsLoading(false);
+        return;
+      }
+
+      const { assignment: detail, hackathon: h, error } = await fetchAssignmentDetail(targetId);
+
+      if (error || !detail) {
+        setErrorMessage(error || 'Failed to load assignment details.');
+        setIsLoading(false);
+        return;
+      }
+
+      setAssignment(detail);
+      setHackathon(h);
+
+      // Load rubric from hackathon configuration or fallback to default
+      const eventRubric =
+        h?.evaluation_rubric && h.evaluation_rubric.length > 0
+          ? h.evaluation_rubric
+          : DEFAULT_RUBRIC;
+      setRubric(eventRubric);
+
+      // Pre-populate if already scored
+      if (detail.existing_score) {
+        const ex = detail.existing_score;
+        setScores(ex.scores || {});
+        setStrengths(ex.strengths || '');
+        setWeaknesses(ex.weaknesses || '');
+        setRecommendation(ex.recommendation || 'advance');
+        setPrivateNotes(ex.private_notes || '');
+        setPublicFeedback(ex.public_feedback || '');
+      } else {
+        // Default initial score to 7.0 for each rubric criterion
+        const initialScores: Record<string, number> = {};
+        eventRubric.forEach((crit) => {
+          const key = crit.criterion || crit.name || 'Criterion';
+          initialScores[key] = 7.0;
+        });
+        setScores(initialScores);
+      }
+    } catch (err: any) {
+      console.warn('[EvaluatorScoringPage] Error loading scoring data:', err);
+      setErrorMessage(err?.message || 'Unable to load scoring workspace.');
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    const { assignment: detail, hackathon: h, error } = await fetchAssignmentDetail(targetId);
-
-    if (error || !detail) {
-      setErrorMessage(error || 'Failed to load assignment details.');
-      setIsLoading(false);
-      return;
-    }
-
-    setAssignment(detail);
-    setHackathon(h);
-
-    // Load rubric from hackathon configuration or fallback to default
-    const eventRubric =
-      h?.evaluation_rubric && h.evaluation_rubric.length > 0
-        ? h.evaluation_rubric
-        : DEFAULT_RUBRIC;
-    setRubric(eventRubric);
-
-    // Pre-populate if already scored
-    if (detail.existing_score) {
-      const ex = detail.existing_score;
-      setScores(ex.scores || {});
-      setStrengths(ex.strengths || '');
-      setWeaknesses(ex.weaknesses || '');
-      setRecommendation(ex.recommendation || 'advance');
-      setPrivateNotes(ex.private_notes || '');
-      setPublicFeedback(ex.public_feedback || '');
-    } else {
-      // Default initial score to 7.0 for each rubric criterion
-      const initialScores: Record<string, number> = {};
-      eventRubric.forEach((crit) => {
-        const key = crit.criterion || crit.name || 'Criterion';
-        initialScores[key] = 7.0;
-      });
-      setScores(initialScores);
-    }
-
-    setIsLoading(false);
   }, [assignmentId, user?.id]);
 
   useEffect(() => {
-    loadData();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadData().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadData]);
 
   // ── 2. Real-Time Calculations ─────────────────────────────────────────────

@@ -92,62 +92,69 @@ export const StudentSubmissionsPage: React.FC = () => {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const effectiveTenantId = tenantId || '26e6c65a-b7a6-4caf-9d6a-1c6f85e9835b';
-    const effectiveUserId = user?.id || 'u-student-aditi';
+    try {
+      const effectiveTenantId = tenantId || '26e6c65a-b7a6-4caf-9d6a-1c6f85e9835b';
+      const effectiveUserId = user?.id || 'u-student-aditi';
 
-    const { hackathons: hList, error: hError } = await fetchTenantHackathons(effectiveTenantId);
-    if (hError) setErrorMessage(hError);
+      const { hackathons: hList, error: hError } = await fetchTenantHackathons(effectiveTenantId);
+      if (hError) setErrorMessage(hError);
 
-    const availableHackathons = hList ?? [];
-    setHackathons(availableHackathons);
+      const availableHackathons = hList ?? [];
+      setHackathons(availableHackathons);
 
-    let activeHackathon = availableHackathons.find(
-      (h) => h.status === 'hacking' || h.status === 'registration' || h.status === 'problem_intake'
-    );
-    if (!activeHackathon && availableHackathons.length > 0) {
-      activeHackathon = availableHackathons[0];
-    }
-
-    const currentHackathonId = selectedHackathonId || activeHackathon?.id || '';
-    if (!selectedHackathonId && currentHackathonId) {
-      setSelectedHackathonId(currentHackathonId);
-    }
-
-    if (currentHackathonId) {
-      const { team, error: tError } = await fetchMyTeam(currentHackathonId, effectiveUserId);
-      if (tError) setErrorMessage(tError);
-      setMyTeam(team);
-
-      if (team) {
-        const { submission: sub, error: sError } = await fetchTeamSubmission(team.id, 1);
-        if (sError) setErrorMessage(sError);
-        setSubmission(sub);
-
-        if (sub) {
-          setTitle(sub.title || '');
-          setAbstract(sub.abstract || '');
-          setApproach(sub.approach || '');
-          setRepoUrl(sub.repo_url || '');
-          setDemoUrl(sub.demo_url || '');
-          setPresentationUrl(sub.presentation_url || '');
-          setVideoUrl(sub.video_url || '');
-          setTechStack(sub.tech_stack || []);
-        } else {
-          // Pre-seed title from selected problem if available
-          if (team.problem_statement?.title && !title) {
-            setTitle(`Solution: ${team.problem_statement.title}`);
-          }
-        }
-      } else {
-        setSubmission(null);
+      let activeHackathon = availableHackathons.find(
+        (h) => h.status === 'hacking' || h.status === 'registration' || h.status === 'problem_intake'
+      );
+      if (!activeHackathon && availableHackathons.length > 0) {
+        activeHackathon = availableHackathons[0];
       }
-    }
 
-    setIsLoading(false);
+      const currentHackathonId = selectedHackathonId || activeHackathon?.id || '';
+      if (!selectedHackathonId && currentHackathonId) {
+        setSelectedHackathonId(currentHackathonId);
+      }
+
+      if (currentHackathonId) {
+        const { team, error: tError } = await fetchMyTeam(currentHackathonId, effectiveUserId);
+        if (tError) setErrorMessage(tError);
+        setMyTeam(team);
+
+        if (team) {
+          const { submission: sub, error: sError } = await fetchTeamSubmission(team.id, 1);
+          if (sError) setErrorMessage(sError);
+          setSubmission(sub);
+
+          if (sub) {
+            setTitle(sub.title || '');
+            setAbstract(sub.abstract || '');
+            setApproach(sub.approach || '');
+            setRepoUrl(sub.repo_url || '');
+            setDemoUrl(sub.demo_url || '');
+            setPresentationUrl(sub.presentation_url || '');
+            setVideoUrl(sub.video_url || '');
+            setTechStack(sub.tech_stack || []);
+          } else {
+            // Pre-seed title from selected problem if available
+            if (team.problem_statement?.title && !title) {
+              setTitle(`Solution: ${team.problem_statement.title}`);
+            }
+          }
+        } else {
+          setSubmission(null);
+        }
+      }
+    } catch (err: any) {
+      console.warn('[StudentSubmissionsPage] Error loading data:', err);
+      setErrorMessage(err?.message || 'Unable to load submission workspace.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [isConfigured, tenantId, user?.id, selectedHackathonId]);
 
   useEffect(() => {
-    loadData();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadData().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadData]);
 
   // ── Tag Management ───────────────────────────────────────────────────────

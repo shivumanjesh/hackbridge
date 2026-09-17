@@ -60,7 +60,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   const [forceReady, setForceReady] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setForceReady(true), 1200);
+    const timer = setTimeout(() => setForceReady(true), 600);
     return () => clearTimeout(timer);
   }, []);
 

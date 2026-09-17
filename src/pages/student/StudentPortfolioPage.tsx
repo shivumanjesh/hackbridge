@@ -92,34 +92,41 @@ export const StudentPortfolioPage: React.FC = () => {
     setErrorMessage(null);
     setIsMigrationMissing(false);
 
-    const { profile, error, isMigrationMissing: missing } = await fetchStudentTalentProfile(
-      effectiveUserId,
-      effectiveTenantId
-    );
+    try {
+      const { profile, error, isMigrationMissing: missing } = await fetchStudentTalentProfile(
+        effectiveUserId,
+        effectiveTenantId
+      );
 
-    if (error) {
-      setErrorMessage(error);
-      if (missing) setIsMigrationMissing(true);
-    } else if (profile) {
-      setTalentProfile(profile);
-      setHeadline(profile.headline || '');
-      setBio(profile.bio || '');
-      setSkills(profile.skills || []);
-      setGithubUrl(profile.github_url || '');
-      setLinkedinUrl(profile.linkedin_url || '');
-      setPortfolioUrl(profile.portfolio_url || '');
-      setResumeUrl(profile.resume_url || '');
-      setAvailableFrom(profile.available_from || '');
-      setLookingFor(profile.looking_for || ['internship', 'full_time']);
-      setPreferredLocation(profile.preferred_location || ['Bangalore', 'Remote']);
-      setIsVisible(profile.is_visible);
+      if (error) {
+        setErrorMessage(error);
+        if (missing) setIsMigrationMissing(true);
+      } else if (profile) {
+        setTalentProfile(profile);
+        setHeadline(profile.headline || '');
+        setBio(profile.bio || '');
+        setSkills(profile.skills || []);
+        setGithubUrl(profile.github_url || '');
+        setLinkedinUrl(profile.linkedin_url || '');
+        setPortfolioUrl(profile.portfolio_url || '');
+        setResumeUrl(profile.resume_url || '');
+        setAvailableFrom(profile.available_from || '');
+        setLookingFor(profile.looking_for || ['internship', 'full_time']);
+        setPreferredLocation(profile.preferred_location || ['Bangalore', 'Remote']);
+        setIsVisible(profile.is_visible);
+      }
+    } catch (err: any) {
+      console.warn('[StudentPortfolioPage] Error loading profile:', err);
+      setErrorMessage(err?.message || 'Unable to load talent profile.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, [user?.id, tenantId]);
 
   useEffect(() => {
-    loadProfile();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadProfile().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadProfile]);
 
   // Skill Management

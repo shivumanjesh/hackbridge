@@ -8,6 +8,33 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        function signalStreamlitReady() {
+          try {
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({
+                isStreamlitMessage: true,
+                type: "streamlit:componentReady",
+                apiVersion: 1
+              }, "*");
+              window.parent.postMessage({
+                isStreamlitMessage: true,
+                type: "streamlit:setFrameHeight",
+                height: Math.max(window.innerHeight, 1080)
+              }, "*");
+            }
+          } catch (e) {}
+        }
+        signalStreamlitReady();
+        window.addEventListener("DOMContentLoaded", signalStreamlitReady);
+        window.addEventListener("load", signalStreamlitReady);
+        setTimeout(signalStreamlitReady, 50);
+        setTimeout(signalStreamlitReady, 200);
+        setTimeout(signalStreamlitReady, 600);
+        setTimeout(signalStreamlitReady, 1200);
+      })();
+    </script>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased font-sans">
     <div id="root"></div>

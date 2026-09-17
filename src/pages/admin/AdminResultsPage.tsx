@@ -58,33 +58,40 @@ export const AdminResultsPage: React.FC = () => {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const { hackathons: hList, error: hError } = await fetchTenantHackathons(tenantId);
-    if (hError) setErrorMessage(hError);
+    try {
+      const { hackathons: hList, error: hError } = await fetchTenantHackathons(tenantId);
+      if (hError) setErrorMessage(hError);
 
-    const available = hList ?? [];
-    setHackathons(available);
+      const available = hList ?? [];
+      setHackathons(available);
 
-    let active = available.find((h) => h.status === 'evaluation' || h.status === 'completed' || h.status === 'hacking');
-    if (!active && available.length > 0) active = available[0];
+      let active = available.find((h) => h.status === 'evaluation' || h.status === 'completed' || h.status === 'hacking');
+      if (!active && available.length > 0) active = available[0];
 
-    const currentId = selectedHackathonId || active?.id || '';
-    if (!selectedHackathonId && currentId) {
-      setSelectedHackathonId(currentId);
+      const currentId = selectedHackathonId || active?.id || '';
+      if (!selectedHackathonId && currentId) {
+        setSelectedHackathonId(currentId);
+      }
+
+      if (currentId) {
+        const { results: rList, error: rError } = await fetchHackathonEvaluationResults(currentId, 1);
+        if (rError) setErrorMessage(rError);
+        setResults(rList);
+      } else {
+        setResults([]);
+      }
+    } catch (err: any) {
+      console.warn('[AdminResultsPage] Error loading results:', err);
+      setErrorMessage(err?.message || 'Unable to load evaluation results.');
+    } finally {
+      setIsLoading(false);
     }
-
-    if (currentId) {
-      const { results: rList, error: rError } = await fetchHackathonEvaluationResults(currentId, 1);
-      if (rError) setErrorMessage(rError);
-      setResults(rList);
-    } else {
-      setResults([]);
-    }
-
-    setIsLoading(false);
   }, [isConfigured, tenantId, selectedHackathonId]);
 
   useEffect(() => {
-    loadData();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadData().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadData]);
 
   // ── Auto Assign Evaluators ───────────────────────────────────────────────

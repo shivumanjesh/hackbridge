@@ -47,20 +47,27 @@ export const StudentOffersPage: React.FC = () => {
     setErrorMessage(null);
     setIsMigrationMissing(false);
 
-    const { inquiries: data, error, isMigrationMissing: missing } = await fetchStudentInquiries(effectiveUserId);
+    try {
+      const { inquiries: data, error, isMigrationMissing: missing } = await fetchStudentInquiries(effectiveUserId);
 
-    if (error) {
-      setErrorMessage(error);
-      if (missing) setIsMigrationMissing(true);
-    } else {
-      setInquiries(data);
+      if (error) {
+        setErrorMessage(error);
+        if (missing) setIsMigrationMissing(true);
+      } else {
+        setInquiries(data);
+      }
+    } catch (err: any) {
+      console.warn('[StudentOffersPage] Error loading inquiries:', err);
+      setErrorMessage(err?.message || 'Unable to load offers.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }, [user?.id]);
 
   useEffect(() => {
-    loadInquiries();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadInquiries().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadInquiries]);
 
   // Open Response Modal

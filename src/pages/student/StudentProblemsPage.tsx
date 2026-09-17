@@ -48,34 +48,41 @@ export const StudentProblemsPage: React.FC = () => {
     const effectiveTenantId = tenantId || '26e6c65a-b7a6-4caf-9d6a-1c6f85e9835b';
     const effectiveUserId = user?.id || 'u-student-aditi';
 
-    const { hackathons: hList, error: hError } = await fetchTenantHackathons(effectiveTenantId);
-    if (hError) setError(hError);
+    try {
+      const { hackathons: hList, error: hError } = await fetchTenantHackathons(effectiveTenantId);
+      if (hError) setError(hError);
 
-    const availableHackathons = hList ?? [];
-    setHackathons(availableHackathons);
+      const availableHackathons = hList ?? [];
+      setHackathons(availableHackathons);
 
-    const currentHackathonId = selectedHackathonId || availableHackathons[0]?.id || '';
-    if (!selectedHackathonId && currentHackathonId) {
-      setSelectedHackathonId(currentHackathonId);
+      const currentHackathonId = selectedHackathonId || availableHackathons[0]?.id || '';
+      if (!selectedHackathonId && currentHackathonId) {
+        setSelectedHackathonId(currentHackathonId);
+      }
+
+      if (currentHackathonId) {
+        // 2. Fetch published problems for this hackathon
+        const { problemStatements: psList, error: psError } =
+          await fetchPublishedProblemStatements(currentHackathonId);
+        if (psError) setError(psError);
+        setProblemStatements(psList ?? []);
+
+        // 3. Fetch user's team
+        const { team } = await fetchMyTeam(currentHackathonId, effectiveUserId);
+        setMyTeam(team);
+      }
+    } catch (err: any) {
+      console.warn('[StudentProblemsPage] Error loading data:', err);
+      setError(err?.message || 'Unable to load problem statements.');
+    } finally {
+      setIsLoading(false);
     }
-
-    if (currentHackathonId) {
-      // 2. Fetch published problems for this hackathon
-      const { problemStatements: psList, error: psError } =
-        await fetchPublishedProblemStatements(currentHackathonId);
-      if (psError) setError(psError);
-      setProblemStatements(psList ?? []);
-
-      // 3. Fetch user's team
-      const { team } = await fetchMyTeam(currentHackathonId, effectiveUserId);
-      setMyTeam(team);
-    }
-
-    setIsLoading(false);
   }, [tenantId, user?.id, selectedHackathonId]);
 
   useEffect(() => {
-    void loadData();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadData().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadData]);
 
   // ── Handle Hackathon Switch ────────────────────────────────────────────────

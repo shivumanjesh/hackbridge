@@ -58,37 +58,44 @@ export const AdminPrescreeningPage: React.FC = () => {
     setIsLoading(true);
     setErrorMessage(null);
 
-    const { hackathons: hList, error: hError } = await fetchTenantHackathons(tenantId);
-    if (hError) setErrorMessage(hError);
+    try {
+      const { hackathons: hList, error: hError } = await fetchTenantHackathons(tenantId);
+      if (hError) setErrorMessage(hError);
 
-    const available = hList ?? [];
-    setHackathons(available);
+      const available = hList ?? [];
+      setHackathons(available);
 
-    let activeHackathon = available.find(
-      (h) => h.status === 'hacking' || h.status === 'evaluation' || h.status === 'registration'
-    );
-    if (!activeHackathon && available.length > 0) {
-      activeHackathon = available[0];
+      let activeHackathon = available.find(
+        (h) => h.status === 'hacking' || h.status === 'evaluation' || h.status === 'registration'
+      );
+      if (!activeHackathon && available.length > 0) {
+        activeHackathon = available[0];
+      }
+
+      const currentHackathonId = selectedHackathonId || activeHackathon?.id || '';
+      if (!selectedHackathonId && currentHackathonId) {
+        setSelectedHackathonId(currentHackathonId);
+      }
+
+      if (currentHackathonId) {
+        const { submissions: subList, error: subErr } = await fetchHackathonPrescreeningSubmissions(currentHackathonId);
+        if (subErr) setErrorMessage(subErr);
+        setSubmissions(subList);
+      } else {
+        setSubmissions([]);
+      }
+    } catch (err: any) {
+      console.warn('[AdminPrescreeningPage] Error loading data:', err);
+      setErrorMessage(err?.message || 'Unable to load pre-screening submissions.');
+    } finally {
+      setIsLoading(false);
     }
-
-    const currentHackathonId = selectedHackathonId || activeHackathon?.id || '';
-    if (!selectedHackathonId && currentHackathonId) {
-      setSelectedHackathonId(currentHackathonId);
-    }
-
-    if (currentHackathonId) {
-      const { submissions: subList, error: subErr } = await fetchHackathonPrescreeningSubmissions(currentHackathonId);
-      if (subErr) setErrorMessage(subErr);
-      setSubmissions(subList);
-    } else {
-      setSubmissions([]);
-    }
-
-    setIsLoading(false);
   }, [isConfigured, tenantId, selectedHackathonId]);
 
   useEffect(() => {
-    loadData();
+    const safety = setTimeout(() => setIsLoading(false), 1000);
+    loadData().finally(() => clearTimeout(safety));
+    return () => clearTimeout(safety);
   }, [loadData]);
 
   // ── 2. Run Batch AI Pre-Screening ────────────────────────────────────────

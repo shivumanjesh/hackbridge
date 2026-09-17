@@ -250,11 +250,14 @@ export const CompanyDashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    const safety = setTimeout(() => setIsLoading(false), 1000);
     if (isConfigured && profile?.id) {
-      void loadMyCompany();
-    } else if (!isConfigured) {
+      loadMyCompany().finally(() => clearTimeout(safety));
+    } else {
       setIsLoading(false);
+      clearTimeout(safety);
     }
+    return () => clearTimeout(safety);
   }, [isConfigured, profile?.id, tenantId]);
 
   if (authLoading) {

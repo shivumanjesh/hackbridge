@@ -50,13 +50,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
-static_index = os.path.join(base_dir, "static", "index.html")
+static_dir = os.path.join(base_dir, "static")
+static_index = os.path.join(static_dir, "index.html")
 
 if os.path.exists(static_index):
-    # Embed the React SPA across 100% of the screen with zero outer Streamlit text
-    if hasattr(st, "iframe"):
-        st.iframe(src="/app/static/index.html", height=1200)
-    else:
-        components.iframe(src="/app/static/index.html", height=1200)
+    # Prefer native Streamlit custom component for instant serving with zero auth redirect loops
+    try:
+        _hackbridge_app = components.declare_component("hackbridge_app", path=static_dir)
+        _hackbridge_app()
+    except Exception as e:
+        # Fallback to direct iframe if declare_component encountered any restriction
+        if hasattr(st, "iframe"):
+            st.iframe(src="/app/static/index.html", height=1200)
+        else:
+            components.iframe(src="/app/static/index.html", height=1200)
 else:
     st.error("Build assets not found in static/. Please build and sync assets.")
+
