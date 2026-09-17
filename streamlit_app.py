@@ -34,7 +34,7 @@ st.markdown("""
         overflow: hidden !important;
     }
 
-    /* Fixed full-screen iframe covering 100% viewport */
+    /* Fixed full-screen iframe covering 100% viewport with scrolling enabled */
     iframe {
         position: fixed !important;
         top: 0 !important;
@@ -45,8 +45,40 @@ st.markdown("""
         margin: 0 !important;
         padding: 0 !important;
         z-index: 999999 !important;
+        overflow: auto !important;
+        pointer-events: auto !important;
     }
 </style>
+
+<script>
+  (function() {
+    function enableIframeScroll() {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        iframe.setAttribute('scrolling', 'yes');
+        iframe.style.overflow = 'auto';
+        iframe.style.pointerEvents = 'auto';
+      });
+    }
+    enableIframeScroll();
+    setInterval(enableIframeScroll, 800);
+
+    // Forward wheel events from Streamlit parent down into the iframe
+    window.addEventListener('wheel', function(e) {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        try {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.postMessage({
+              type: 'hackbridge:scroll',
+              deltaY: e.deltaY
+            }, '*');
+          }
+        } catch (err) {}
+      });
+    }, { passive: true });
+  })();
+</script>
 """, unsafe_allow_html=True)
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
