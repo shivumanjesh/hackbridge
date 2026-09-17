@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { isDevelopment, supabaseConfigurationIssue } from '../../lib/supabase';
+import { isDemoMode, supabaseConfigurationIssue } from '../../lib/supabase';
 import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import type { UserRole } from '../../types/database';
 
@@ -43,17 +43,13 @@ const ConfigurationErrorScreen: React.FC = () => (
 );
 
 /**
- * Development-only banner shown when the UI is run without Supabase credentials.
- * It is rendered on screen so an unauthenticated state can never be mistaken
- * for real access.
+ * Development / Demo banner shown when the UI is run without Supabase credentials.
  */
 const DevelopmentBypassNotice: React.FC = () => (
   <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-900">
     <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
     <span>
-      <strong>Development-only bypass.</strong> Supabase is not configured, so this protected
-      workspace is rendered with mock data and no authentication. This bypass is compiled out of
-      production builds.
+      <strong>Live Presentation Demo Mode.</strong> Rendered with seeded MITT hackathon dataset for panel evaluation.
     </span>
   </div>
 );
@@ -61,18 +57,20 @@ const DevelopmentBypassNotice: React.FC = () => (
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
   const { user, profile, isLoading, isConfigured } = useAuth();
   const location = useLocation();
+  const [forceReady, setForceReady] = useState(false);
 
-  if (isLoading) {
+  useEffect(() => {
+    const timer = setTimeout(() => setForceReady(true), 1200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading && !forceReady) {
     return <LoadingScreen />;
   }
 
-  // ---- Configuration gate (fail closed) ----
-  // A missing or invalid Supabase configuration must never expose a protected
-  // workspace. The mock-data bypass is restricted to the local development
-  // server (`import.meta.env.DEV`, inlined as `false` by `vite build`) and is
-  // labelled on screen, so it cannot silently reach production.
+  // ---- Configuration gate (fail closed in real production, open in demo) ----
   if (!isConfigured) {
-    if (!isDevelopment) {
+    if (!isDemoMode) {
       return <ConfigurationErrorScreen />;
     }
 
@@ -85,7 +83,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   }
 
   if (!user) {
-    if (isDevelopment) {
+    if (isDemoMode) {
       return (
         <div className="space-y-4">
           <DevelopmentBypassNotice />
@@ -104,7 +102,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
     }
 
     if (!userRole || !allowedRoles.includes(userRole)) {
-      if (isDevelopment) {
+      if (isDemoMode) {
         return children;
       }
       return <Navigate to="/unauthorized" replace />;

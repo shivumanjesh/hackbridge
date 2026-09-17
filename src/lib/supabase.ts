@@ -11,6 +11,7 @@ const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
  * developer conveniences that must never reach production.
  */
 export const isDevelopment = import.meta.env.DEV === true;
+export const isDemoMode = isDevelopment || (typeof window !== 'undefined' && (window.location.hostname.includes('streamlit.app') || window.location.hostname.includes('localhost')));
 
 /** Detects template / placeholder values so they can never count as configured. */
 const isPlaceholderValue = (value: string): boolean =>

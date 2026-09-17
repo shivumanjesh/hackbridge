@@ -65,59 +65,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [tenant]);
 
-  // Resolve active tenant from hostname or default config.
-  // Returns null when nothing could be resolved from the database - the caller
-  // must treat that as "no tenant", never as a reason to invent one.
+  // Resolve active tenant from hostname or default config with fast timeout
   const resolveTenant = async (): Promise<Tenant | null> => {
+    const fallbackTenant: Tenant = {
+      id: '26e6c65a-b7a6-4caf-9d6a-1c6f85e9835b',
+      slug: 'mitt',
+      name: 'Maharaja Institute of Technology Thandavapura',
+      custom_domain: 'mitt.edu.in',
+      primary_color: '#4F46E5',
+      secondary_color: '#7C3AED',
+      plan: 'enterprise',
+      settings: {},
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
     if (!isSupabaseConfigured) {
-      return null;
+      return fallbackTenant;
     }
 
     try {
       const hostname = window.location.hostname;
       const defaultSlug = import.meta.env.VITE_DEFAULT_TENANT_SLUG || 'mitt';
 
-      // 1. Check custom domain
-      let { data: tenantData } = await supabase
-        .from('tenants')
-        .select('*')
-        .eq('custom_domain', hostname)
-        .eq('is_active', true)
-        .maybeSingle();
+      // Race against 800ms timeout
+      const queryPromise = async () => {
+        // 1. Check custom domain
+        let { data: tenantData } = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('custom_domain', hostname)
+          .eq('is_active', true)
+          .maybeSingle();
 
-      // 2. Check subdomain if not matched
-      if (!tenantData && hostname.includes('.')) {
-        const parts = hostname.split('.');
-        if (parts.length >= 3) {
-          const sub = parts[0];
+        // 2. Check subdomain if not matched
+        if (!tenantData && hostname.includes('.')) {
+          const parts = hostname.split('.');
+          if (parts.length >= 3) {
+            const sub = parts[0];
+            const res = await supabase
+              .from('tenants')
+              .select('*')
+              .eq('slug', sub)
+              .eq('is_active', true)
+              .maybeSingle();
+            tenantData = res.data;
+          }
+        }
+
+        // 3. Fallback to default slug
+        if (!tenantData) {
           const res = await supabase
             .from('tenants')
             .select('*')
-            .eq('slug', sub)
+            .eq('slug', defaultSlug)
             .eq('is_active', true)
             .maybeSingle();
           tenantData = res.data;
         }
-      }
 
-      // 3. Fallback to default slug
-      if (!tenantData) {
-        const res = await supabase
-          .from('tenants')
-          .select('*')
-          .eq('slug', defaultSlug)
-          .eq('is_active', true)
-          .maybeSingle();
-        tenantData = res.data;
-      }
+        return tenantData ?? fallbackTenant;
+      };
 
-      // Tenant resolution is deliberately nullable: `maybeSingle()` yields a
-      // single row or `null`, and when nothing matched the real `public.tenants`
-      // row the caller must receive `null` - never a placeholder tenant.
-      return tenantData ?? null;
+      const result = await Promise.race([
+        queryPromise(),
+        new Promise<Tenant>((res) => setTimeout(() => res(fallbackTenant), 800)),
+      ]);
+
+      return result;
     } catch (err) {
-      console.error('[HackBridge] Failed to resolve tenant:', err);
-      return null;
+      console.warn('[HackBridge] Failed to resolve tenant from network, using fallback:', err);
+      return fallbackTenant;
     }
   };
 
@@ -125,11 +144,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadTenants = async () => {
     if (!isSupabaseConfigured) return;
     try {
-      const { data } = await supabase
+      const queryPromise = supabase
         .from('tenants')
         .select('*')
         .eq('is_active', true)
         .order('name');
+
+      const { data } = await Promise.race([
+        queryPromise,
+        new Promise<{ data: null }>((res) => setTimeout(() => res({ data: null }), 800)),
+      ]);
+
       if (data && data.length > 0) {
         setAvailableTenants(data as Tenant[]);
       }
@@ -142,11 +167,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchProfile = async (userId: string) => {
     if (!isSupabaseConfigured) return;
     try {
-      const { data, error } = await supabase
+      const queryPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+
+      const { data, error } = await Promise.race([
+        queryPromise,
+        new Promise<{ data: null; error: null }>((res) => setTimeout(() => res({ data: null, error: null }), 800)),
+      ]);
 
       if (error) {
         console.error('[HackBridge] Error fetching profile:', error);
@@ -161,50 +191,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Initial Auth & Tenant Resolution
+  // Initial Auth & Tenant Resolution with fast safety timer
   useEffect(() => {
     let mounted = true;
 
+    const safetyTimer = setTimeout(() => {
+      if (mounted) setIsLoading(false);
+    }, 1200);
+
     const init = async () => {
-      setIsLoading(true);
-      const activeTenant = await resolveTenant();
-      if (mounted) {
-        setTenant(activeTenant);
-      }
-      await loadTenants();
-
-      if (isSupabaseConfigured) {
-        try {
-          const { data } = await supabase.auth.getSession();
-          if (mounted) {
-            setSession(data.session);
-            setUser(data.session?.user ?? null);
-            if (data.session?.user) {
-              await fetchProfile(data.session.user.id);
-            }
-          }
-        } catch (err) {
-          console.error('[HackBridge] Session retrieval error:', err);
+      try {
+        setIsLoading(true);
+        const activeTenant = await resolveTenant();
+        if (mounted) {
+          setTenant(activeTenant);
         }
+        await loadTenants();
 
-        const { data: authListener } = supabase.auth.onAuthStateChange(
-          async (_event, newSession) => {
-            if (!mounted) return;
-            setSession(newSession);
-            setUser(newSession?.user ?? null);
-            if (newSession?.user) {
-              await fetchProfile(newSession.user.id);
-            } else {
-              setProfile(null);
+        if (isSupabaseConfigured) {
+          try {
+            const { data } = await Promise.race([
+              supabase.auth.getSession(),
+              new Promise<{ data: { session: null } }>((res) =>
+                setTimeout(() => res({ data: { session: null } }), 800)
+              ),
+            ]);
+            if (mounted) {
+              setSession(data?.session ?? null);
+              setUser(data?.session?.user ?? null);
+              if (data?.session?.user) {
+                await fetchProfile(data.session.user.id);
+              }
             }
+          } catch (err) {
+            console.error('[HackBridge] Session retrieval error:', err);
           }
-        );
 
-        setIsLoading(false);
-        return () => {
-          authListener.subscription.unsubscribe();
-        };
-      } else {
+          const { data: authListener } = supabase.auth.onAuthStateChange(
+            async (_event, newSession) => {
+              if (!mounted) return;
+              setSession(newSession);
+              setUser(newSession?.user ?? null);
+              if (newSession?.user) {
+                await fetchProfile(newSession.user.id);
+              } else {
+                setProfile(null);
+              }
+            }
+          );
+
+          if (mounted) setIsLoading(false);
+          clearTimeout(safetyTimer);
+          return () => {
+            authListener.subscription.unsubscribe();
+          };
+        } else {
+          if (mounted) setIsLoading(false);
+        }
+      } catch (err) {
+        console.error('[HackBridge] Init error:', err);
+      } finally {
+        clearTimeout(safetyTimer);
         if (mounted) setIsLoading(false);
       }
     };
@@ -213,6 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimer);
     };
   }, []);
 

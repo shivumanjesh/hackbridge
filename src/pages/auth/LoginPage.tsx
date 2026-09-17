@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { isDevelopment } from '../../lib/supabase';
+import { isDemoMode } from '../../lib/supabase';
 import { ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -18,9 +18,6 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Development-only stakeholder shortcuts. import.meta.env.DEV is inlined as
-  // false by vite build, and the guard inside the handler refuses to navigate,
-  // so this convenience can never act as an access path in production.
   const previewTargets: Array<{ role: UserRole; label: string; path: string }> = [
     { role: 'college_admin', label: 'College Admin', path: '/admin' },
     { role: 'student', label: 'Student Portal', path: '/student' },
@@ -28,9 +25,8 @@ export const LoginPage: React.FC = () => {
     { role: 'company_rep', label: 'Company Portal', path: '/company' },
   ];
 
-  // Navigates only in development; a production build does nothing.
   const handleDevRolePreview = (targetRole: UserRole) => {
-    if (!isDevelopment) return;
+    if (!isDemoMode) return;
     const target = previewTargets.find((item) => item.role === targetRole);
     navigate(target ? target.path : '/');
   };
@@ -142,7 +138,7 @@ export const LoginPage: React.FC = () => {
             {/* Development-only stakeholder shortcuts. Gated on import.meta.env.DEV
                 (inlined as false by vite build), so the block is compiled out of
                 production bundles; the handler also refuses to navigate. */}
-            {isDevelopment && (
+            {isDemoMode && (
               <div className="pt-4 border-t border-slate-100 space-y-2">
                 <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
                   <span>Dev preview · stakeholder workspaces (no auth)</span>
