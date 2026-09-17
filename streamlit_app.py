@@ -55,8 +55,8 @@ static_index = os.path.join(base_dir, "static", "index.html")
 if os.path.exists(static_index):
     # Embed the React SPA across 100% of the screen with zero outer Streamlit text
     if hasattr(st, "iframe"):
-        st.iframe(src="/app/static/index.html", height=1200, scrolling=True)
+        st.iframe(src="/app/static/index.html", height=1200)
     else:
-        components.iframe(src="/app/static/index.html", height=1200, scrolling=True)
+        components.iframe(src="/app/static/index.html", height=1200)
 else:
     st.error("Build assets not found in static/. Please build and sync assets.")
