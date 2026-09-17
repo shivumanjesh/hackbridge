@@ -10,10 +10,8 @@ def prepare_static():
         print("dist directory not found! Run npm run build first.")
         return
 
-    if os.path.exists(static_dir):
-        shutil.rmtree(static_dir)
-
-    shutil.copytree(dist_dir, static_dir)
+    os.makedirs(static_dir, exist_ok=True)
+    shutil.copytree(dist_dir, static_dir, dirs_exist_ok=True)
     print(f"Successfully synced {dist_dir} -> {static_dir}")
 
 if __name__ == "__main__":
