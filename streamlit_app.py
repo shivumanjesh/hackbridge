@@ -82,7 +82,10 @@ if nav_choice == "🚀 Live Application":
     # Render embedded application using Streamlit static serving
     if os.path.exists(index_html_path):
         # Embed via iframe pointing to the static app endpoint
-        components.iframe(src="/app/static/index.html", height=820, scrolling=True)
+        if hasattr(st, "iframe"):
+            st.iframe(src="/app/static/index.html", height=820, scrolling=True)
+        else:
+            components.iframe(src="/app/static/index.html", height=820, scrolling=True)
     else:
         st.warning("Production build not detected in static/ directory. Please run `npm run build && python scripts/prepare_streamlit.py`.")
 
